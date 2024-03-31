@@ -16,7 +16,7 @@ import (
 )
 
 type Response struct {
-	Token string `json:"token"`
+	AccessToken string `json:"access_token"`
 }
 
 type Request struct {
@@ -92,7 +92,7 @@ func New(log *slog.Logger, userProvider UserProvider, authSecret string, tokenTL
 
 		response.RespondWithJson(w, 200,
 			Response{
-				Token: token,
+				AccessToken: token,
 			},
 		)
 	}
