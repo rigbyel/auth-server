@@ -47,7 +47,7 @@ func main() {
 
 	// handlers
 	router.Post("/register", register.New(log, storage))
-	router.Post("/login", login.New(log, storage, cfg.JwtSecret, cfg.TokenTL))
+	router.Post("/authorize", login.New(log, storage, cfg.JwtSecret, cfg.TokenTL))
 	router.Get("/feed", show.New(log, cfg.JwtSecret))
 
 	// starting server
