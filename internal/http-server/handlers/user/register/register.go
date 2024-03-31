@@ -4,23 +4,24 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"strings"
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
+	"github.com/go-playground/validator/v10"
 	"github.com/rigbyel/auth-server/internal/lib/response"
-	validate "github.com/rigbyel/auth-server/internal/lib/validate/password"
+	"github.com/rigbyel/auth-server/internal/lib/validate"
 	"github.com/rigbyel/auth-server/internal/models"
 	"github.com/rigbyel/auth-server/internal/storage"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type Response struct {
-	ID int64 `json:"id"`
+	ID                  int64  `json:"user_id"`
+	PasswordCheckStatus string `json:"password_check_status"`
 }
 
 type Request struct {
-	Email    string `json:"email"`
+	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password"`
 }
 
@@ -52,15 +53,24 @@ func New(log *slog.Logger, userSaver UserSaver) http.HandlerFunc {
 
 		log.Info("request body decoded", slog.Any("request", req))
 
-		// validating login and password
-		var validationErrs []string
+		// validating email
+		if err := validator.New().Struct(req); err != nil {
+			validateErr := err.(validator.ValidationErrors)
+			log.Error("invalid request", slog.String("error", err.Error()))
 
-		validationErrs = validate.ValidatePassword(req.Password)
+			response.RespondWithError(w, 400, validate.ValidationErrors(validateErr))
 
-		if len(validationErrs) != 0 {
-			log.Error("invalid request data")
+			return
+		}
 
-			response.RespondWithError(w, 400, strings.Join(validationErrs, ", "))
+		// validating password
+		pwdStrength := validate.ValidatePassword(req.Password)
+
+		if pwdStrength == validate.Weak {
+			log.Error("weak password")
+
+			response.RespondWithError(w, 400, "weak_password")
+
 			return
 		}
 
@@ -101,7 +111,8 @@ func New(log *slog.Logger, userSaver UserSaver) http.HandlerFunc {
 
 		response.RespondWithJson(w, 201,
 			Response{
-				ID: user.Id,
+				ID:                  user.Id,
+				PasswordCheckStatus: pwdStrength,
 			},
 		)
 	}
